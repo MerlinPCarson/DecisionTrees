@@ -16,7 +16,7 @@ def load_csv(fileName):
 	# open file and read data
     file = open(fileName, "rb")
     lines = csv.reader(file)
-    data = list(lines)[1:20]          # leave out first row/headers
+    data = list(lines)[1:]          # leave out first row/headers
 	# convert data from strings to floats
     for column in range(len(data[0])):
         if column != SHELVELOC and column != URBAN and column != US:
@@ -107,7 +107,7 @@ def check_split(feature, value, data):
     return leftSplit, rightSplit
 
 def max_split(data):
-    sales = list(set(row[0] for row in data))
+#    sales = list(set(row[0] for row in data))
 #    splitFeature = 999
 #    splitValue = 999
     splitRSS = sys.maxint
@@ -127,7 +127,7 @@ def max_split(data):
                 splitRSS = rss
                 splitData = testSplit
 
-    print splitFeature, splitValue, splitRSS		
+#    print splitFeature, splitValue, splitRSS		
     return {'feature':splitFeature, 'value':splitValue, 'split':splitData}
 
 def eval_gini(split, vals):
@@ -160,12 +160,15 @@ def eval_RSS(split, actualScore, feature, splitVal):
  #           scores.append(row[0])
 
         if len(data) > 0:
-            scores = [row[0] for row in data]
+            prices = [row[0] for row in data]
+            mean = np.mean(prices)
  #           print np.median(scores), actualScore, feature
-            rss += (np.mean(scores)-actualScore)**2
+ #           rss += (np.mean(scores)-actualScore)**2
+            for price in prices:
+                rss += (price-mean)**2
 
-    print 'RSS with: ', rss, actualScore, feature, splitVal
-    return rss/2        # average of left and right side error
+#    print 'RSS with: ', rss, actualScore, feature, splitVal
+    return rss        # average of left and right side error
 
 # Make a prediction on data using the decision tree
 # prediction is at the leaf recursed to
@@ -208,28 +211,29 @@ def evaluate(predictions, actual):
     SStotal = 0.0
     for target in targets:
         SStotal += (target-targetMean)**2
-    print SStotal
+ #   print SStotal
     SSres = 0.0
     for cnt in range(len(actual)):
         SSres += (targets[cnt]-preds[cnt])**2
-    print SSres
+ #   print SSres
     #mean = np.mean((preds-targets)**2)
     #rms = np.sqrt(np.mean((preds-targets)**2))
     #print SSres, SStotal
+    # R^2 value
     if SStotal > SSres:
-        return 1 - (SSres/SStotal)
+        return (SSres/SStotal)
     else:
-        return 1 - (SStotal/SSres)
+        return (SStotal/SSres)
     #return mean_squared_error(actual,predictions)
 
 def eval_tree(data):
     folds = k_folds(data)
-    cnt = 1
-    for fold in folds:
-        print 'fold: ', cnt
-        for ele in fold:
-            print ele
-        cnt += 1
+ #   cnt = 1
+ #   for fold in folds:
+ #       print 'fold: ', cnt
+ #       for ele in fold:
+ #           print ele
+ #       cnt += 1
  
     foldsAccuracy = list()
 	
