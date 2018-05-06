@@ -2,9 +2,10 @@ import sys
 import random
 import csv
 import numpy as np
+#from sklearn.metrics import mean_squared_error
 
 MAX_HEIGHT = 5
-MAX_DATA = 10
+MAX_DATA = 2
 FOLDS = 2
 DATACSV = 'Carseats.csv'
 SHELVELOC = 6
@@ -15,7 +16,7 @@ def load_csv(fileName):
 	# open file and read data
     file = open(fileName, "rb")
     lines = csv.reader(file)
-    data = list(lines)[1:]          # leave out first row/headers
+    data = list(lines)[1:20]          # leave out first row/headers
 	# convert data from strings to floats
     for column in range(len(data[0])):
         if column != SHELVELOC and column != URBAN and column != US:
@@ -26,32 +27,32 @@ def load_csv(fileName):
 
 # Print a decision tree
 def print_classTree(node, depth=0):
-	if isinstance(node, dict):
-		print('%s[X%d < %.3f]' % ((depth*' ', (node['feature']+1), node['value'])))
-		print_classTree(node['left'], depth+1)
-		print_classTree(node['right'], depth+1)
-	else:
-		print('%s[%s]' % ((depth*' ', node)))
+    if isinstance(node, dict):
+        print('%s[X%d < %.3f]' % ((depth*' ', (node['feature']), node['value'])))
+        print_classTree(node['left'], depth+1)
+        print_classTree(node['right'], depth+1)
+    else:
+        print('%s[%s]' % ((depth*' ', node)))
 
 # create and evaluate a classification decision tree
 def class_tree(trainData, testData):
 	# make the tree
-	tree = decision_tree(trainData)
-	predictions = list()
-	print_classTree(tree)
+    tree = decision_tree(trainData)
+    predictions = list()
+    print_classTree(tree)
 	# get predictions on new data
-	for element in testData:
-		predictions.append(predict(element, tree))
+    for element in testData:
+        predictions.append(predict(element, tree))
 
-	return predictions
+    return predictions
 
 # create a decision tree using the training data
 def decision_tree(trainData):
 	# create root of tree
     root = max_split(trainData)
-    print 'root', len(root['split'])
-    print root['split'][0]
-    print root['split'][1]
+ #   print 'root', len(root['split'])
+ #   print root['split'][0]
+ #   print root['split'][1]
 	# recursive splitting
     split_node(1, root)
     return root
@@ -59,39 +60,39 @@ def decision_tree(trainData):
 # recursive splitting of nodes in decision tree
 # stopping point is data on one side only, MAX_DEPTH, or less than MAX_DATA
 def split_node(currHeight, currNode):
-	left, right = currNode['split']
+    left, right = currNode['split']
 
 #	del(node['data'])
 	# no split required, no data 
-	if not left or not right:
-		currNode['left'] = make_leaf(left+right)
-		currNode['right'] = make_leaf(left+right)
-		return
+    if not left or not right:
+        currNode['left'] = make_leaf(left+right)
+        currNode['right'] = make_leaf(left+right)
+        return
 
 	# no split required, at MAX HEIGHT of tree
-	if currHeight >= MAX_HEIGHT:
-		currNode['left'] = make_leaf(left)
-		currNode['right'] = make_leaf(right)
-		return
+    if currHeight >= MAX_HEIGHT:
+        currNode['left'] = make_leaf(left)
+        currNode['right'] = make_leaf(right)
+        return
 
 	# recurse left
-	if len(left) <= MAX_DATA:
-		currNode['left'] = make_leaf(left)
-	else:
-		currNode['left'] = max_split(left)
-		split_node(currHeight + 1, currNode['left'])
+    if len(left) <= MAX_DATA:
+        currNode['left'] = make_leaf(left)
+    else:
+        currNode['left'] = max_split(left)
+        split_node(currHeight + 1, currNode['left'])
 	
 	# recurse right
-	if len(right) <= MAX_DATA:
-		currNode['right'] = make_leaf(right)
-	else:
-		currNode['right'] = max_split(right)
-		split_node(currHeight + 1, currNode['right'])
+    if len(right) <= MAX_DATA:
+        currNode['right'] = make_leaf(right)
+    else:
+        currNode['right'] = max_split(right)
+        split_node(currHeight + 1, currNode['right'])
 
-def make_leaf(group):
+def make_leaf(data):
 	# classification of data
-	classes = [row[-1] for row in group]
-	return max(set(classes), key=classes.count)
+    scores = [row[0] for row in data]
+    return np.median(scores)
 
 def check_split(feature, value, data):
     leftSplit  = list()
@@ -117,16 +118,16 @@ def max_split(data):
             continue
         for row in data:
             testSplit = check_split(feature, row[feature], data)
-            rss = eval_RSS(testSplit, row[0])
+            rss = eval_RSS(testSplit, row[0], feature, row[feature])
 
 #            print('X%d < %.3f RSS=%.3f'% ((feature+1), row[feature], rss))
             if rss < splitRSS:
-				splitFeature = feature
-				splitValue = row[feature]
-				splitRSS = rss
-				splitData = testSplit
+                splitFeature = feature
+                splitValue = row[feature]
+                splitRSS = rss
+                splitData = testSplit
 
-    print splitFeature, splitValue		
+    print splitFeature, splitValue, splitRSS		
     return {'feature':splitFeature, 'value':splitValue, 'split':splitData}
 
 def eval_gini(split, vals):
@@ -148,79 +149,108 @@ def eval_gini(split, vals):
     
     return score
 
-def eval_RSS(split, actualScore):
+def eval_RSS(split, actualScore, feature, splitVal):
     # RSS for the split
     rss = 0.0
     # summ RSS for left side and right side
     for data in split:
         # scores from data for median
-        scores = list()
-        for row in data:
-            scores.append(row[0])
-        if len(data) > 0:
-            rss += (np.median(scores)-actualScore)**2
+ #       scores = list()
+ #       for row in data:
+ #           scores.append(row[0])
 
+        if len(data) > 0:
+            scores = [row[0] for row in data]
+ #           print np.median(scores), actualScore, feature
+            rss += (np.mean(scores)-actualScore)**2
+
+    print 'RSS with: ', rss, actualScore, feature, splitVal
     return rss/2        # average of left and right side error
 
 # Make a prediction on data using the decision tree
 # prediction is at the leaf recursed to
 def predict(example, node):
-	if example[node['feature']] < node['value']:
-		if isinstance(node['left'], dict):
-			return predict(example, node['left'])
-		else:
-			return node['left']
-	else:
-		if isinstance(node['right'], dict):
-			return predict(example, node['right'])
-		else:
-			return node['right']
+    if example[node['feature']] < node['value']:
+        if isinstance(node['left'], dict):
+            return predict(example, node['left'])
+        else:
+            return node['left']
+    else:
+        if isinstance(node['right'], dict):
+            return predict(example, node['right'])
+        else:
+            return node['right']
 
 # split data into folds for validation
 def k_folds(data):
-	folds = list()
-	tmpData = list(data)
-	foldSize = len(data)/FOLDS
+    folds = list()
+    tmpData = list(data)
+    foldSize = len(data)/FOLDS
 	# split data into k folds
-	for cnt in range(FOLDS):
-		fold = list()
-		while len(fold) < foldSize:
-			selection = random.randrange(len(tmpData))
-			fold.append(tmpData.pop(selection))
-		folds.append(fold)
-	return folds
+    for cnt in range(FOLDS):
+        fold = list()
+        while len(fold) < foldSize:
+            selection = random.randrange(len(tmpData))
+            fold.append(tmpData.pop(selection))
+        folds.append(fold)
+    return folds
 
 def evaluate(predictions, actual):
-	num_correct = 0
-	for cnt in range(len(actual)):
+#    num_correct = 0
+#    for cnt in range(len(actual)):
 #		print (actual[cnt], '?=', predictions[cnt])
-		if actual[cnt] == predictions[cnt]:
-			num_correct += 1
+#        total += 
 #	print num_correct		
-	return num_correct / float(len(actual)) 
+#    return num_correct / float(len(actual)) 
+    preds = np.array(predictions)
+    targets = np.array(actual)
+    targetMean = np.mean(actual)
+    SStotal = 0.0
+    for target in targets:
+        SStotal += (target-targetMean)**2
+    print SStotal
+    SSres = 0.0
+    for cnt in range(len(actual)):
+        SSres += (targets[cnt]-preds[cnt])**2
+    print SSres
+    #mean = np.mean((preds-targets)**2)
+    #rms = np.sqrt(np.mean((preds-targets)**2))
+    #print SSres, SStotal
+    if SStotal > SSres:
+        return 1 - (SSres/SStotal)
+    else:
+        return 1 - (SStotal/SSres)
+    #return mean_squared_error(actual,predictions)
 
 def eval_tree(data):
-	folds = k_folds(data)
-	foldsAccuracy = list()
+    folds = k_folds(data)
+    cnt = 1
+    for fold in folds:
+        print 'fold: ', cnt
+        for ele in fold:
+            print ele
+        cnt += 1
+ 
+    foldsAccuracy = list()
 	
-	for fold in folds:
-		trainSet = list(folds)
-		trainSet.remove(fold)
-		trainSet = sum(trainSet, [])
-		testSet = list()
+    for fold in folds:
+        trainSet = list(folds)
+        trainSet.remove(fold)
+        trainSet = sum(trainSet, [])
+        testSet = list()
 		
-		for element in fold:
-			tmpEle = list(element)
-			testSet.append(tmpEle)
-			tmpEle[-1] = None
-		predictions = class_tree(trainSet, testSet)
-#		print predictions
-		actual = [element[-1] for element in fold ]
-#		print actual
-		accuracy = evaluate(predictions, actual)
-		foldsAccuracy.append(accuracy)
+        for element in fold:
+            tmpEle = list(element)
+            testSet.append(tmpEle)
+ #           tmpEle[-1] = None
+        predictions = class_tree(trainSet, testSet)
+        print predictions
+        actual = [element[0] for element in fold ]
+        print actual
+        accuracy = evaluate(predictions, actual)
+        foldsAccuracy.append(accuracy)
 	
-	return foldsAccuracy
+    return foldsAccuracy
 
 
 # MAIN PROGRAM
@@ -228,11 +258,12 @@ def eval_tree(data):
 random.seed(1)
 
 # load data
-data = load_csv(DATACSV)        
+data = load_csv(DATACSV)    
+  
 
 # create and evaluate decision tree
 evaluation = eval_tree(data)
-# print results
 
+# print results
 print ('Fold Accuracies: ', evaluation)
 print ('Mean accuracy: %.3f' % (sum(evaluation)/(len(evaluation))))
