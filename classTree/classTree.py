@@ -33,10 +33,10 @@ def class_tree(trainData, testData):
 	# make the tree
 	tree = decision_tree(trainData)
 	predictions = list()
-	print_classTree(tree)
+#	print_classTree(tree)
 	# get predictions on new data
 	for element in testData:
-		predictions.append(predict(tree, element))
+		predictions.append(predict(element, tree))
 
 	return predictions
 
@@ -140,7 +140,7 @@ def eval_gini(split, vals):
 # Make a prediction on data using the decision tree
 # prediction is at the leaf recursed to
 def predict(example, node):
-	if example[node['index']] < node['value']:
+	if example[node['feature']] < node['value']:
 		if isinstance(node['left'], dict):
 			return predict(example, node['left'])
 		else:
@@ -168,9 +168,11 @@ def k_folds(data):
 def evaluate(predictions, actual):
 	num_correct = 0
 	for cnt in range(len(actual)):
+#		print (actual[cnt], '?=', predictions[cnt])
 		if actual[cnt] == predictions[cnt]:
 			num_correct += 1
-	return num_correct / len(actual) 
+#	print num_correct		
+	return num_correct / float(len(actual)) 
 
 def eval_tree(data):
 	folds = k_folds(data)
@@ -187,8 +189,10 @@ def eval_tree(data):
 			testSet.append(tmpEle)
 			tmpEle[-1] = None
 		predictions = class_tree(trainSet, testSet)
+#		print predictions
 		actual = [element[-1] for element in fold ]
-		accuracy = evaluate(actual, predictions)
+#		print actual
+		accuracy = evaluate(predictions, actual)
 		foldsAccuracy.append(accuracy)
 	
 	return foldsAccuracy
@@ -199,44 +203,18 @@ def eval_tree(data):
 random.seed(1)
 # load data
 data = load_csv(DATACSV)
+
+#folds = k_folds(data)
+#cnt = 1
+#for fold in folds:
+#cnt += 1 
+#	for ele in fold:
+#		print ele
+	
 # create and evaluate decision tree
 evaluation = eval_tree(data)
 # print results
-#for foldNum in range(FOLDS)
-print ('Accuracys: %s', evaluation)
-print ('Mean accuracy: %.3f%%' % (sum(evaluation)/(len(evaluation))))
 
-### TESTING ###
-# test eval_gini
-#print(eval_gini([[[1,1],[1,0]],[[1,1], [1,0]]], [0,1]))
-#print(eval_gini([[[1,0],[1,0]],[[1,1], [1,1]]], [0,1]))
-
-# eval data
-#data = [[2.771244718,1.784783929,0],
-#	[1.728571309,1.169761413,0],
-#	[3.678319846,2.81281357,0],
-#	[7.497545867,3.162953546,1],
-#	[9.00220326,3.339047188,1],
-#	[7.444542326,0.476683375,1],
-#	[10.12493903,3.234550982,1],
-#	[6.642287351,3.319983761,1]]
-
-# test splitting
-#split = max_split(data)
-#print('Split: [X%d < %.3f]' % ((split['feature']+1), split['value']))
-
-# test decision tree
-#tree = decision_tree(data)
-#print_classTree(tree)
-
-# test predictor
-#  predict with a stump
-#stump = {'index': 0, 'right': 1, 'value': 6.642287351, 'left': 0}
-#for row in data:
-#	print type(stump), type(row)
-#	prediction = predict(row, stump)
-#	print('Expected=%d, Got=%d' % (row[-1], prediction))
-
-# temp testing!!!
-
+print ('Fold Accuracies: ', evaluation)
+print ('Mean accuracy: %.3f' % (sum(evaluation)/(len(evaluation))))
 
