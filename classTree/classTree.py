@@ -2,17 +2,45 @@ import sys
 import random
 import csv
 
-MAX_HEIGHT = 3
-MAX_DATA = 1
+MAX_HEIGHT = 5
+MAX_DATA = 10
 FOLDS = 5
 DATACSV = 'data_banknote_authentication.txt'
 
 def load_csv(fileName):
+	# open file and read data
 	file = open(fileName, "rb")
-	return  csv.reader(file)
+	lines = csv.reader(file)
+	data = list(lines)
+	# convert data from strings to floats
+	for column in range(len(data[0])):
+		for row in data:
+			row[column] = float(row[column])
 	#return list(lines)
+	return data
 
+# Print a decision tree
+def print_classTree(node, depth=0):
+	if isinstance(node, dict):
+		print('%s[X%d < %.3f]' % ((depth*' ', (node['feature']+1), node['value'])))
+		print_classTree(node['left'], depth+1)
+		print_classTree(node['right'], depth+1)
+	else:
+		print('%s[%s]' % ((depth*' ', node)))
 
+# create and evaluate a classification decision tree
+def class_tree(trainData, testData):
+	# make the tree
+	tree = decision_tree(trainData)
+	predictions = list()
+	print_classTree(tree)
+	# get predictions on new data
+	for element in testData:
+		predictions.append(predict(tree, element))
+
+	return predictions
+
+# create a decision tree using the training data
 def decision_tree(trainData):
 	# create root of tree
 	root = max_split(trainData)
@@ -20,6 +48,8 @@ def decision_tree(trainData):
 	split_node(1, root)
 	return root
 
+# recursive splitting of nodes in decision tree
+# stopping point is data on one side only, MAX_DEPTH, or less than MAX_DATA
 def split_node(currHeight, currNode):
 	left, right = currNode['split']
 
@@ -78,14 +108,14 @@ def max_split(data):
 		for row in data:
 			testSplit = check_split(feature, row[feature], data)
 			giniScore = eval_gini(testSplit, classes)
-			print('X%d < %.3f GiniScore=%.3f'% ((feature+1), row[feature], giniScore))
+#			print('X%d < %.3f GiniScore=%.3f'% ((feature+1), row[feature], giniScore))
 			if giniScore < splitScore:
 				splitFeature = feature
 				splitValue = row[feature]
 				splitScore = giniScore
 				splitData = testSplit
 
-	print splitFeature, splitValue		
+#	print splitFeature, splitValue		
 	return {'feature':splitFeature, 'value':splitValue, 'split':splitData}
 
 def eval_gini(split, vals):
@@ -107,15 +137,6 @@ def eval_gini(split, vals):
     
     return score
 
-# Print a decision tree
-def print_classTree(node, depth=0):
-	if isinstance(node, dict):
-		print('%s[X%d < %.3f]' % ((depth*' ', (node['feature']+1), node['value'])))
-		print_classTree(node['left'], depth+1)
-		print_classTree(node['right'], depth+1)
-	else:
-		print('%s[%s]' % ((depth*' ', node)))
-
 # Make a prediction on data using the decision tree
 # prediction is at the leaf recursed to
 def predict(example, node):
@@ -130,11 +151,60 @@ def predict(example, node):
 		else:
 			return node['right']
 
+# split data into folds for validation
+def k_folds(data):
+	folds = list()
+	tmpData = list(data)
+	foldSize = len(data)/FOLDS
+	# split data into k folds
+	for cnt in range(FOLDS):
+		fold = list()
+		while len(fold) < foldSize:
+			selection = random.randrange(len(tmpData))
+			fold.append(tmpData.pop(selection))
+		folds.append(fold)
+	return folds
 
+def evaluate(predictions, actual):
+	num_correct = 0
+	for cnt in range(len(actual)):
+		if actual[cnt] == predictions[cnt]:
+			num_correct += 1
+	return num_correct / len(actual) 
+
+def eval_tree(data):
+	folds = k_folds(data)
+	foldsAccuracy = list()
+	
+	for fold in folds:
+		trainSet = list(folds)
+		trainSet.remove(fold)
+		trainSet = sum(trainSet, [])
+		testSet = list()
+		
+		for element in fold:
+			tmpEle = list(element)
+			testSet.append(tmpEle)
+			tmpEle[-1] = None
+		predictions = class_tree(trainSet, testSet)
+		actual = [element[-1] for element in fold ]
+		accuracy = evaluate(actual, predictions)
+		foldsAccuracy.append(accuracy)
+	
+	return foldsAccuracy
+
+
+# MAIN PROGRAM
+
+random.seed(1)
+# load data
 data = load_csv(DATACSV)
-for ele in data:
-	print ele
-
+# create and evaluate decision tree
+evaluation = eval_tree(data)
+# print results
+#for foldNum in range(FOLDS)
+print ('Accuracys: %s', evaluation)
+print ('Mean accuracy: %.3f%%' % (sum(evaluation)/(len(evaluation))))
 
 ### TESTING ###
 # test eval_gini
