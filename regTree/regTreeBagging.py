@@ -8,7 +8,7 @@ MAX_DATA = 10
 FOLDS = 2
 BAGGING = False
 RANDOM_FOREST = False
-NUM_TREES = 20
+NUM_TREES = 10
 BAG_RATIO = .67
 DATACSV = 'Carseats.csv'
 SHELVELOC = 6
@@ -32,7 +32,10 @@ def load_csv(fileName):
 # Print a decision tree
 def print_tree(node, depth=0):
     if isinstance(node, dict):
-        print('%s[X%d < %.3f]' % ((depth*' ', (node['feature']), node['value'])))
+        if node['feature'] != SHELVELOC and node['feature'] != URBAN and node['feature'] != US:
+            print('%s[X%d < %.3f]' % ((depth*' ', (node['feature']), node['value'])))
+        else:
+            print('%s[X%s = %s]' % ((depth*' ', (node['feature']), node['value']))) 
         print_tree(node['left'], depth+1)
         print_tree(node['right'], depth+1)
     else:
@@ -100,10 +103,18 @@ def check_split(feature, value, data):
     rightSplit = list()
 	# determine data split by feature and value
     for row in data:
-        if row[feature] < value:
-            leftSplit.append(row)
+        # categorical feature
+        if feature == SHELVELOC or feature == URBAN or feature == US:
+            if row[feature] == value:
+                leftSplit.append(row)
+            else:
+                rightSplit.append(row)
+        # numerical feature
         else:
-            rightSplit.append(row)
+            if row[feature] < value:
+                leftSplit.append(row)
+            else:
+                rightSplit.append(row)
 
     return leftSplit, rightSplit
 
@@ -119,13 +130,13 @@ def max_split(data):
             selection = random.randrange(1, total_features)         # don't select first feature, sales
             # add features without replacement
             if selection not in features:
-                if selection != SHELVELOC and selection != URBAN and selection != US:
-                    features.append(selection)
+ #               if selection != SHELVELOC and selection != URBAN and selection != US:
+                features.append(selection)
     # add all features to feature set to maximize split
     else:
         for feature in range(1, total_features):                    # don't select first feature, sales
-            if feature != SHELVELOC and feature != URBAN and feature != US:
-                features.append(feature)                             
+ #           if feature != SHELVELOC and feature != URBAN and feature != US:
+            features.append(feature)                             
 
     for feature in features:
 #        if feature == SHELVELOC or feature == URBAN or feature == US:
@@ -263,7 +274,6 @@ random.seed(1)
 
 # load data
 data = load_csv(DATACSV)    
-  
 
 # create and evaluate decision tree
 evaluation = eval_tree(data)
