@@ -6,7 +6,9 @@ import numpy as np
 MAX_HEIGHT = 5
 MAX_DATA = 10
 FOLDS = 2
-NUM_TREES = 10
+BAGGING = True
+RANDOM_FOREST = True
+NUM_TREES = 20
 BAG_RATIO = .67
 DATACSV = 'Carseats.csv'
 SHELVELOC = 6
@@ -106,10 +108,26 @@ def check_split(feature, value, data):
 def max_split(data):
 
     splitRSS = sys.maxint
+    total_features = len(data[0])
+    features = list()
+    if RANDOM_FOREST == True:
+        num_features = int(np.sqrt(total_features))
+        # add num_features amount of features to feature set to maximize split
+        while len(features) < num_features:
+            selection = random.randrange(1, total_features)         # don't select first feature, sales
+            # add features without replacement
+            if selection not in features:
+                if selection != SHELVELOC and selection != URBAN and selection != US:
+                    features.append(selection)
+    # add all features to feature set to maximize split
+    else:
+        for feature in range(1, features):                          # don't select first feature, sales
+            if feature != SHELVELOC and feature != URBAN and feature != US:
+                features.append(feature)                             
 
-    for feature in range(1, len(data[0])):
-        if feature == SHELVELOC or feature == URBAN or feature == US:
-            continue
+    for feature in features:
+#        if feature == SHELVELOC or feature == URBAN or feature == US:
+#            continue
         for row in data:
             testSplit = check_split(feature, row[feature], data)
             rss = eval_RSS(testSplit, row[0], feature, row[feature])
@@ -122,25 +140,6 @@ def max_split(data):
 
 #    print splitFeature, splitValue, splitRSS		
     return {'feature':splitFeature, 'value':splitValue, 'split':splitData}
-
-def eval_gini(split, vals):
-    # number of samples
-    samples = float(sum([len(data) for data in split]))
-
-    #sum for each class
-    score = 0.0
-    for data in split:
-        size = float(len(data))
-        if size > 0:
-            count = 0.0
-            # get proportions for each class
-            for value in vals:
-                proportion = [row[-1] for row in data].count(value)/size
-                count += proportion * proportion
-            # calc score for gini evaluation
-            score += (1.0-count)*(size/samples)
-    
-    return score
 
 def eval_RSS(split, actualScore, feature, splitVal):
     # RSS for the split
@@ -212,7 +211,13 @@ def eval_tree(data):
             testSet.append(tmpEle)
 
         # bagging
-        predictions = bagging(trainSet,testSet)
+        if BAGGING == True:
+            predictions = bagging(trainSet,testSet)
+ #       elif RANDOM_FOREST == True:
+ #           predictions = bagging(trainSet,testSet)
+        else:
+            predictions = class_tree(trainSet, testSet)
+
  #       for tree in range(NUM_TREES):
  #           baggedSet, valSet = bag(trainSet)
  #           predictions = class_tree(baggedSet, valSet)
