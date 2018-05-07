@@ -6,8 +6,8 @@ import numpy as np
 MAX_HEIGHT = 5
 MAX_DATA = 10
 FOLDS = 2
-BAGGING = True
-RANDOM_FOREST = True
+BAGGING = False
+RANDOM_FOREST = False
 NUM_TREES = 20
 BAG_RATIO = .67
 DATACSV = 'Carseats.csv'
@@ -20,7 +20,8 @@ def load_csv(fileName):
     file = open(fileName, "rb")
     lines = csv.reader(file)
     data = list(lines)[1:]          # leave out first row/headers
-	# convert data from strings to floats
+	
+    # convert data from strings to floats
     for column in range(len(data[0])):
         if column != SHELVELOC and column != URBAN and column != US:
             for row in data:
@@ -29,20 +30,21 @@ def load_csv(fileName):
     return data
 
 # Print a decision tree
-def print_classTree(node, depth=0):
+def print_tree(node, depth=0):
     if isinstance(node, dict):
         print('%s[X%d < %.3f]' % ((depth*' ', (node['feature']), node['value'])))
-        print_classTree(node['left'], depth+1)
-        print_classTree(node['right'], depth+1)
+        print_tree(node['left'], depth+1)
+        print_tree(node['right'], depth+1)
     else:
         print('%s[%s]' % ((depth*' ', node)))
 
 # create and evaluate a classification decision tree
-def class_tree(trainData, testData):
+def single_tree(trainData, testData, foldCnt):
 	# make the tree
     tree = decision_tree(trainData)
     predictions = list()
-    print_classTree(tree)
+    print '\nDecision Tree (fold {}): \n'.format(foldCnt)
+    print_tree(tree)
 	# get predictions on new data
     for element in testData:
         predictions.append(predict(element, tree))
@@ -121,7 +123,7 @@ def max_split(data):
                     features.append(selection)
     # add all features to feature set to maximize split
     else:
-        for feature in range(1, features):                          # don't select first feature, sales
+        for feature in range(1, total_features):                    # don't select first feature, sales
             if feature != SHELVELOC and feature != URBAN and feature != US:
                 features.append(feature)                             
 
@@ -175,7 +177,7 @@ def k_folds(data):
     tmpData = list(data)
     foldSize = len(data)/FOLDS
 	# split data into k folds
-    for cnt in range(FOLDS):
+    for _ in range(FOLDS):
         fold = list()
         while len(fold) < foldSize:
             selection = random.randrange(len(tmpData))
@@ -200,7 +202,9 @@ def eval_tree(data):
     folds = k_folds(data)
     foldsAccuracy = list()
 	
+    foldCnt = 0
     for fold in folds:
+        foldCnt += 1
         trainSet = list(folds)
         trainSet.remove(fold)
         trainSet = sum(trainSet, [])
@@ -212,27 +216,25 @@ def eval_tree(data):
 
         # bagging
         if BAGGING == True:
-            predictions = bagging(trainSet,testSet)
- #       elif RANDOM_FOREST == True:
- #           predictions = bagging(trainSet,testSet)
+            predictions = ensemble_trees(trainSet,testSet, foldCnt)
         else:
-            predictions = class_tree(trainSet, testSet)
+            predictions = single_tree(trainSet, testSet, foldCnt)
 
- #       for tree in range(NUM_TREES):
- #           baggedSet, valSet = bag(trainSet)
- #           predictions = class_tree(baggedSet, valSet)
+        # determine accuracy of tree(s)
         actual = [data[0] for data in fold]
         accuracy = evaluate(predictions, actual)
- #       accuracy /= NUM_TREES
 
+        # save accuracy of fold
         foldsAccuracy.append(accuracy)
 	
     return foldsAccuracy
 
 # train NUM_TREES of trees using bagging
-def bagging(trainSet, testSet):
+def ensemble_trees(trainSet, testSet, foldCnt):
     trees = list()
-    for cnt in range (NUM_TREES):
+    print 'fold ', foldCnt
+    for treeNum in range (NUM_TREES):
+        print 'Building tree ', treeNum
         trainSubset = bag(trainSet)
         tree = decision_tree(trainSubset)
         trees.append(tree)
@@ -267,5 +269,5 @@ data = load_csv(DATACSV)
 evaluation = eval_tree(data)
 
 # print results
-print ('Fold Accuracies: ', evaluation)
-print ('Mean accuracy: %.3f' % (sum(evaluation)/(len(evaluation))))
+print '\nFold RMSE: ', evaluation
+print 'Mean RMSE: %.3f \n' % (sum(evaluation)/(len(evaluation)))
