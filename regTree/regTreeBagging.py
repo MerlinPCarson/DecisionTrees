@@ -1,4 +1,5 @@
 import sys
+import time
 import random
 import csv
 import numpy as np
@@ -10,6 +11,7 @@ BAGGING = False
 RANDOM_FOREST = False
 NUM_TREES = 10
 BAG_RATIO = .67
+NORMALIZE = True
 DATACSV = 'Carseats.csv'
 SHELVELOC = 6
 URBAN = 9
@@ -24,8 +26,20 @@ def load_csv(fileName):
     # convert data from strings to floats
     for column in range(len(data[0])):
         if column != SHELVELOC and column != URBAN and column != US:
+            if NORMALIZE == True:
+                featureSet = [float(example[column]) for example in data] 
+                featureMin = np.min(featureSet)
+                featureMax = np.max(featureSet)
+                #featureMean = np.mean(featureSet)
+                #featureStd = np.std(featureSet)
             for row in data:
-                row[column] = float(row[column])
+                if NORMALIZE == True:
+                    # min/max normalization
+                    row[column] = (float(row[column])-featureMin)/(featureMax-featureMin)
+                    # Standardization    
+                    #row[column] = (float(row[column])-featureMean)/featureStd
+                else:    
+                    row[column] = float(row[column])
 	
     return data
 
@@ -33,9 +47,9 @@ def load_csv(fileName):
 def print_tree(node, depth=0):
     if isinstance(node, dict):
         if node['feature'] != SHELVELOC and node['feature'] != URBAN and node['feature'] != US:
-            print('%s[X%d < %.3f]' % ((depth*' ', (node['feature']), node['value'])))
+            print('%s(X%d < %.3f)' % ((depth*' ', (node['feature']), node['value'])))
         else:
-            print('%s[X%s = %s]' % ((depth*' ', (node['feature']), node['value']))) 
+            print('%s(X%s = %s)' % ((depth*' ', (node['feature']), node['value']))) 
         print_tree(node['left'], depth+1)
         print_tree(node['right'], depth+1)
     else:
@@ -270,7 +284,7 @@ def bag(trainSet):
 
 # MAIN PROGRAM
 
-random.seed(1)
+random.seed(time.time())
 
 # load data
 data = load_csv(DATACSV)    
