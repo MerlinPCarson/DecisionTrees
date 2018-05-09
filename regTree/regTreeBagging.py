@@ -5,12 +5,12 @@ import csv
 import numpy as np
 from copy import deepcopy
 
-MAX_HEIGHT = 2
+MAX_HEIGHT = 5
 MAX_DATA = 5
 FOLDS = 4
 TUNING = False
-BAGGING = True
-RANDOM_FOREST = True
+BAGGING = False
+RANDOM_FOREST = False
 NUM_TREES = 10
 BAG_RATIO = .67
 NORMALIZE = True
@@ -20,6 +20,8 @@ SHELVELOC = 6
 URBAN = 9
 US = 10
 
+
+# load data from CSV file and convert numerical data from str->float
 def load_csv(fileName):
 	# open file and read data
     file = open(fileName, "rb")
@@ -29,22 +31,11 @@ def load_csv(fileName):
     # convert data from strings to floats
     for column in range(len(data[0])):
         if column != SHELVELOC and column != URBAN and column != US:
-#            if NORMALIZE == True:
-#                featureSet = [float(example[column]) for example in data] 
-#                featureMin = np.min(featureSet)
-#                featureMax = np.max(featureSet)
-                #featureMean = np.mean(featureSet)
-                #featureStd = np.std(featureSet)
             for row in data:
- #           if NORMALIZE == True:
-                    # min/max normalization
- #                   row[column] = (float(row[column])-featureMin)/(featureMax-featureMin)
-                    # Standardization    
-                    #row[column] = (float(row[column])-featureMean)/featureStd
- #               else:    
                 row[column] = float(row[column])
 	
     return data
+
 
 # Print a decision tree
 def print_tree(node, depth=0):
@@ -57,6 +48,7 @@ def print_tree(node, depth=0):
         print_tree(node['right'], depth+1)
     else:
         print('%s[%s]' % ((depth*' ', node)))
+
 
 # create and evaluate a classification decision tree
 def single_tree(trainData, testData, foldCnt):
@@ -71,6 +63,7 @@ def single_tree(trainData, testData, foldCnt):
 
     return predictions
 
+
 # create a decision tree using the training data
 def decision_tree(trainData):
 	# create root of tree
@@ -78,6 +71,7 @@ def decision_tree(trainData):
     # recursive splitting, creating the tree
     split_node(1, root)
     return root
+
 
 # recursive splitting of nodes in decision tree
 # stopping point is data on one side only, MAX_DEPTH, or less than MAX_DATA
@@ -110,11 +104,13 @@ def split_node(currHeight, currNode):
         currNode['right'] = max_split(right)
         split_node(currHeight + 1, currNode['right'])
 
+
 # makes a leaf at the bottom of the decision tree, i.e. a prediction
 def make_leaf(data):
-	# classification of data
+	# classification of data, median value of data in the node
     scores = [row[0] for row in data]
     return np.median(scores)
+
 
 # splits data in to left and right by feature/value
 def check_split(feature, value, data):
@@ -137,6 +133,7 @@ def check_split(feature, value, data):
 
     return leftSplit, rightSplit
 
+
 # checks all possible splits for training example and selects one with lowest RSS
 def max_split(data):
 
@@ -150,29 +147,26 @@ def max_split(data):
             selection = random.randrange(1, total_features)         # don't select first feature, sales
             # add features without replacement
             if selection not in features:
- #               if selection != SHELVELOC and selection != URBAN and selection != US:
                 features.append(selection)
     # add all features to feature set to maximize split
     else:
         for feature in range(1, total_features):                    # don't select first feature, sales
- #           if feature != SHELVELOC and feature != URBAN and feature != US:
-            features.append(feature)                             
+             features.append(feature)                             
 
+    # find feature split with lowest RSS
     for feature in features:
-#        if feature == SHELVELOC or feature == URBAN or feature == US:
-#            continue
         for row in data:
             testSplit = check_split(feature, row[feature], data)
             rss = eval_RSS(testSplit, row[0], feature, row[feature])
-#            print('X%d < %.3f RSS=%.3f'% ((feature+1), row[feature], rss))
+
             if rss < splitRSS:
                 splitFeature = feature
                 splitValue = row[feature]
                 splitRSS = rss
                 splitData = testSplit
 
-#    print splitFeature, splitValue, splitRSS		
     return {'feature':splitFeature, 'value':splitValue, 'split':splitData}
+
 
 # calculate the RSS of a split
 def eval_RSS(split, actualScore, feature, splitVal):
@@ -186,8 +180,8 @@ def eval_RSS(split, actualScore, feature, splitVal):
             for price in prices:
                 rss += (price-mean)**2
 
-#    print 'RSS with: ', rss, actualScore, feature, splitVal
     return rss        # average of left and right side error
+
 
 # Make a prediction on data using the decision tree
 # prediction is at the leaf recursed to
@@ -202,6 +196,7 @@ def predict(example, node):
             return predict(example, node['right'])
         else:
             return node['right']
+
 
 # split data into folds for validation
 def k_folds(data):
@@ -220,19 +215,21 @@ def k_folds(data):
     
     return folds
 
+
+# evaluate and return the RMSE
 def evaluate(predictions, actual):
     preds = np.array(predictions)
     targets = np.array(actual)
-    targetMean = np.mean(actual)
-    SStotal = 0.0
-    for target in targets:
-        SStotal += (target-targetMean)**2
 
+    # calculate the sum of squared errors
     SSres = 0.0
     for cnt in range(len(actual)):
         SSres += (targets[cnt]-preds[cnt])**2
+    
     return SSres/len(actual)    #RMSE
 
+# The main decision tree algorithm
+# creates k-folds, creates tree, evaluates tree
 def eval_tree(data):
     folds = k_folds(data)
     foldsAccuracy = list()
@@ -255,13 +252,9 @@ def eval_tree(data):
                     example[feature] = (example[feature]-featureMin)/(featureMax-featureMin)
                 for example in testSet:
                     example[feature] = (example[feature]-featureMin)/(featureMax-featureMin)      
-		
-#        for example in fold:
-#            tmpEle = list(example)
-#            testSet.append(tmpEle)
 
-        # bagging
-        if BAGGING == True:
+        # bagging/RandomForests
+        if BAGGING == True or RANDOM_FOREST == True:
             predictions = ensemble_trees(trainSet,testSet, foldCnt)
         else:
             predictions = single_tree(trainSet, testSet, foldCnt)
@@ -275,7 +268,8 @@ def eval_tree(data):
 	
     return foldsAccuracy
 
-# train NUM_TREES of trees using bagging
+
+# train NUM_TREES of trees using bagging and or RandomForest
 def ensemble_trees(trainSet, testSet, foldCnt):
     trees = list()
     print 'fold ', foldCnt
@@ -287,11 +281,14 @@ def ensemble_trees(trainSet, testSet, foldCnt):
     predictions = [bagged_predict(trees, data) for data in testSet]
     return predictions
 
+
 # predict values using ensemble of bagged trees
 def bagged_predict(trees, data):
     predictions = [predict(data, tree) for tree in trees]
     return np.median(predictions)
 
+
+# create bagged(selection with replacement) training set
 def bag(trainSet):
     bagSet = list()
     num_in_bag = round(len(trainSet)*BAG_RATIO)
@@ -301,6 +298,7 @@ def bag(trainSet):
         bagSet.append(trainSet[selection])
 
     return bagSet
+
 
 # create and evaluate decision trees with hyperparameter search
 def tune_decisionTree(data):
@@ -323,6 +321,7 @@ def tune_decisionTree(data):
             print '\nFold RMSE: ', evaluation
             print 'Mean RMSE: %.3f \n' % (sum(evaluation)/(len(evaluation)))
 
+
 # create and evaluate bagging, decision trees with hyperparameter search
 def tune_bagging(data):
     global NUM_TREES, BAGGING, RANDOM_FOREST
@@ -341,6 +340,7 @@ def tune_bagging(data):
         print '\nFold RMSE: ', evaluation
         print 'Mean RMSE: %.3f \n' % (sum(evaluation)/(len(evaluation)))
 
+
 # create and evaluate random forest, decision trees with hyperparameter search
 def tune_randomForest(data):
     global NUM_TREES, BAGGING, RANDOM_FOREST
@@ -354,12 +354,15 @@ def tune_randomForest(data):
         for numtrees in maxtrees:
             print 'tree max : ', numtrees
             NUM_TREES = numtrees
+            MAX_HEIGHT = height
             evaluation = eval_tree(data)
 
             # print results
             print '\nFold RMSE: ', evaluation
             print 'Mean RMSE: %.3f \n' % (sum(evaluation)/(len(evaluation)))
 
+
+# builds decision tree(s) using default constants
 def default_fit(data):
     evaluation = eval_tree(data)
 
