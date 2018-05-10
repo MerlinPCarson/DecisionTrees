@@ -1,3 +1,12 @@
+ ########################
+##  Merlin Carson       ##
+##  CS446, Spring 2018  ##
+##  Decision Tree:      ##
+##   - Pruning          ## 
+##   - Bagging          ##
+##   - Random Forest    ##
+ ########################
+
 import sys
 import time
 import random
@@ -5,17 +14,19 @@ import csv
 import numpy as np
 from copy import deepcopy
 
-MAX_HEIGHT = 5
+MAX_HEIGHT = 4
 MAX_DATA = 5
 FOLDS = 2
 TUNING = False 
-BAGGING = True
-RANDOM_FOREST = True
+BAGGING = False
+RANDOM_FOREST = False
 NUM_TREES = 10
 BAG_RATIO = .67
 NORMALIZE = True
+PRUNE = True
+ALPHA = 0.1
 DATACSV = 'Carseats.csv'
-# feature number for CATEGORICAL data
+# feature numbers for CATEGORICAL data
 SHELVELOC = 6
 URBAN = 9
 US = 10
@@ -57,7 +68,27 @@ def single_tree(trainData, testData, foldCnt):
     predictions = list()
     print '\nDecision Tree (fold {}): \n'.format(foldCnt)
     print_tree(tree)
-	# get predictions on new data
+
+    # Do you really want to prune the tree?
+    if PRUNE:
+        # determine complexity by counting number of leaves
+        origNumLeaves = numLeaves = count_leaves(tree)
+        prevNumLeaves = sys.maxint
+        # determine accuracy of tree
+        accuracy = get_RMSEregularized(tree, testData, numLeaves)
+        while numLeaves < prevNumLeaves:
+            prevNumLeaves = numLeaves
+            # prune da tree
+            print '\npre-pruned RMSE: ', accuracy
+            prune(tree, tree, testData, accuracy, numLeaves)
+#            numLeaves = count_leaves(tree)
+            accuracy = get_RMSEregularized(tree, testData, numLeaves)
+        
+        # printing pruned tree
+        print '\nPruned Tree: \n'
+        print_tree(tree)
+	
+    # get predictions on new data
     for element in testData:
         predictions.append(predict(element, tree))
 
@@ -103,6 +134,77 @@ def split_node(currHeight, currNode):
     else:
         currNode['right'] = max_split(right)
         split_node(currHeight + 1, currNode['right'])
+
+
+# get number of leaves
+def count_leaves(currNode):
+
+    if not isinstance(currNode['left'], dict) or not isinstance(currNode['right'], dict):
+        if not isinstance(currNode['left'], dict) and not isinstance(currNode['right'], dict):
+            return 2
+        elif not isinstance(currNode['right'], dict):
+            return count_leaves(currNode['left']) + 1
+        else:
+            return count_leaves(currNode['right']) + 1
+
+    return count_leaves(currNode['left']) + count_leaves(currNode['right'])
+
+
+# recursive Prunning function
+def prune(root, currNode, testSet, accuracy, num_leaves):
+#    left, right = currNode['split']
+#    leftLeft, leftRight = left['split']
+#    rightLeft, rightRight = right['split']
+
+    if not isinstance(currNode['left'], dict) and not isinstance(currNode['right'], dict):
+        return
+
+    # if next left is a leaf, cross validate RSS w/regularization
+    if not isinstance(currNode['left'], dict):
+ 
+        saveCurrNode = currNode
+        currNode = currNode['right']
+        prunedRMSE = get_RMSEregularized(root, testSet, num_leaves-1)
+        print 'pruned RMSE: ', prunedRMSE
+        
+        # if RMSE is higher after pruning, restore pruned leaf
+        if prunedRMSE > accuracy:
+            currNode = saveCurrNode
+        else:
+            num_leaves -= 1
+            accuracy = prunedRMSE
+
+    # if next right is a leaf, cross validate RSS w/regularization
+    elif not isinstance(currNode['right'], dict):
+ 
+        saveCurrNode = currNode
+        currNode = currNode['left']
+        prunedRMSE = get_RMSEregularized(root, testSet, num_leaves-1)
+        print 'pruned RMSE: ', prunedRMSE
+
+        # if RMSE is higher after pruning, restore pruned leaf
+        if prunedRMSE > accuracy:
+            currNode = saveCurrNode
+        else:
+            num_leaves -= 1
+            accuracy = prunedRMSE
+    
+    if isinstance(currNode['left'], dict): 
+        prune(root, currNode['left'], testSet, accuracy, num_leaves)
+    if isinstance(currNode['right'], dict):     
+        prune(root, currNode['right'], testSet, accuracy, num_leaves)
+
+
+# calculate regularized RMSE
+def get_RMSEregularized(tree, testData, num_leaves):
+    predictions = list()
+    # get predictions on pruned tree
+    for element in testData:
+        predictions.append(predict(element, tree))
+
+    actual = [example[0] for example in testData]
+     
+    return evaluateRegularized(predictions, actual, num_leaves)
 
 
 # makes a leaf at the bottom of the decision tree, i.e. a prediction
@@ -226,7 +328,20 @@ def evaluate(predictions, actual):
     for cnt in range(len(actual)):
         SSres += (targets[cnt]-preds[cnt])**2
     
-    return SSres/len(actual)    #RMSE
+    return np.sqrt(SSres/len(actual))    #RMSE
+
+
+# evaluate and return the regularized RMSE
+def evaluateRegularized(predictions, actual, num_leaves):
+    preds = np.array(predictions)
+    targets = np.array(actual)
+
+    # calculate the sum of squared errors
+    SSres = 0.0
+    for cnt in range(len(actual)):
+        SSres += (targets[cnt]-preds[cnt])**2 + (ALPHA * num_leaves)
+    
+    return np.sqrt(SSres/len(actual))    #RMSE
 
 # The main decision tree algorithm
 # creates k-folds, creates tree, evaluates tree
