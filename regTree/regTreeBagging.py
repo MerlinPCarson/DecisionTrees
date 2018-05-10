@@ -7,10 +7,10 @@ from copy import deepcopy
 
 MAX_HEIGHT = 5
 MAX_DATA = 5
-FOLDS = 4
-TUNING = False
-BAGGING = False
-RANDOM_FOREST = False
+FOLDS = 2
+TUNING = False 
+BAGGING = True
+RANDOM_FOREST = True
 NUM_TREES = 10
 BAG_RATIO = .67
 NORMALIZE = True
@@ -308,7 +308,8 @@ def tune_decisionTree(data):
     #hyperparameter search space
     maxheight   = [2,5,10,20]
     maxdata     = [2,5,10,20]
-    
+
+    print 'Tuning decision tree'
     for height in maxheight:
         for numdata in maxdata:
             MAX_HEIGHT = height
@@ -331,6 +332,7 @@ def tune_bagging(data):
     #hyperparameter search space
     maxtrees    = [2, 4, 6, 8, 10, 12, 14, 16]
 
+    print 'Tuning bagged ensemble of decision trees'
     for numtrees in maxtrees:
         print 'tree max : ', numtrees
         NUM_TREES = numtrees
@@ -343,13 +345,14 @@ def tune_bagging(data):
 
 # create and evaluate random forest, decision trees with hyperparameter search
 def tune_randomForest(data):
-    global NUM_TREES, BAGGING, RANDOM_FOREST
+    global MAX_HEIGHT, NUM_TREES, BAGGING, RANDOM_FOREST
     BAGGING = RANDOM_FOREST = True
 
     #hyperparameter search space
     maxtrees    = [20, 40, 60, 80, 100]
     maxheight   = [1,2,3,5,8]
 
+    print 'Tuning random forest'
     for height in maxheight:
         for numtrees in maxtrees:
             print 'tree max : ', numtrees
