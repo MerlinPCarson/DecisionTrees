@@ -80,12 +80,12 @@ def single_tree(trainData, testData, foldCnt):
             prevNumLeaves = numLeaves
             # prune da tree
             print '\npre-pruned RMSE: ', accuracy
-            prune(tree, tree, testData, accuracy, numLeaves)
-#            numLeaves = count_leaves(tree)
+            prune(tree, tree, tree, 'none', testData, accuracy, numLeaves)
+            numLeaves = count_leaves(tree)
             accuracy = get_RMSEregularized(tree, testData, numLeaves)
         
         # printing pruned tree
-        print '\nPruned Tree: \n'
+        print '\nPruned Tree({} leaves pruned): \n'.format(origNumLeaves-numLeaves)
         print_tree(tree)
 	
     # get predictions on new data
@@ -151,25 +151,34 @@ def count_leaves(currNode):
 
 
 # recursive Prunning function
-def prune(root, currNode, testSet, accuracy, num_leaves):
-#    left, right = currNode['split']
-#    leftLeft, leftRight = left['split']
-#    rightLeft, rightRight = right['split']
+def prune(root, currNode, prevNode, prevNodeSide, testSet, accuracy, num_leaves):
 
     if not isinstance(currNode['left'], dict) and not isinstance(currNode['right'], dict):
-        return
-
-    # if next left is a leaf, cross validate RSS w/regularization
-    if not isinstance(currNode['left'], dict):
- 
-        saveCurrNode = currNode
-        currNode = currNode['right']
+        saveCurrNode = currNode 
+        prevNode[prevNodeSide] = make_leaf(currNode['split'][0] + currNode['split'][1])
         prunedRMSE = get_RMSEregularized(root, testSet, num_leaves-1)
         print 'pruned RMSE: ', prunedRMSE
         
         # if RMSE is higher after pruning, restore pruned leaf
         if prunedRMSE > accuracy:
-            currNode = saveCurrNode
+            prevNode[prevNodeSide] = saveCurrNode
+        else:
+            num_leaves -= 1
+            accuracy = prunedRMSE
+
+        return
+
+    # if next left is a leaf, cross validate RSS w/regularization
+    if not isinstance(currNode['left'], dict):
+ 
+        saveCurrNode = currNode 
+        prevNode[prevNodeSide] = currNode['right']
+        prunedRMSE = get_RMSEregularized(root, testSet, num_leaves-1)
+        print 'pruned RMSE: ', prunedRMSE
+        
+        # if RMSE is higher after pruning, restore pruned leaf
+        if prunedRMSE > accuracy:
+            prevNode[prevNodeSide] = saveCurrNode
         else:
             num_leaves -= 1
             accuracy = prunedRMSE
@@ -178,21 +187,21 @@ def prune(root, currNode, testSet, accuracy, num_leaves):
     elif not isinstance(currNode['right'], dict):
  
         saveCurrNode = currNode
-        currNode = currNode['left']
+        prevNode[prevNodeSide] = currNode['left']
         prunedRMSE = get_RMSEregularized(root, testSet, num_leaves-1)
         print 'pruned RMSE: ', prunedRMSE
 
         # if RMSE is higher after pruning, restore pruned leaf
         if prunedRMSE > accuracy:
-            currNode = saveCurrNode
+            prevNode[prevNodeSide] = saveCurrNode
         else:
             num_leaves -= 1
             accuracy = prunedRMSE
     
     if isinstance(currNode['left'], dict): 
-        prune(root, currNode['left'], testSet, accuracy, num_leaves)
+        prune(root, currNode['left'], currNode, 'left', testSet, accuracy, num_leaves)
     if isinstance(currNode['right'], dict):     
-        prune(root, currNode['right'], testSet, accuracy, num_leaves)
+        prune(root, currNode['right'], currNode, 'right', testSet, accuracy, num_leaves)
 
 
 # calculate regularized RMSE
@@ -421,8 +430,8 @@ def tune_decisionTree(data):
     BAGGING = RANDOM_FOREST = False
     
     #hyperparameter search space
-    maxheight   = [2,5,10,20]
-    maxdata     = [2,5,10,20]
+    maxheight   = [2,5,10,15,20,25]
+    maxdata     = [2,3,4,5,6,7,8,9,10,12,14,16,18,20]
 
     print 'Tuning decision tree'
     for height in maxheight:
@@ -445,7 +454,7 @@ def tune_bagging(data):
     RANDOM_FOREST = False
     
     #hyperparameter search space
-    maxtrees    = [2, 4, 6, 8, 10, 12, 14, 16]
+    maxtrees    = [2, 4, 6, 8, 10, 12, 14, 16, 20, 25, 30, 40, 50, 75, 100]
 
     print 'Tuning bagged ensemble of decision trees'
     for numtrees in maxtrees:
@@ -464,8 +473,8 @@ def tune_randomForest(data):
     BAGGING = RANDOM_FOREST = True
 
     #hyperparameter search space
-    maxtrees    = [20, 40, 60, 80, 100]
-    maxheight   = [1,2,3,5,8]
+    maxtrees    = [5, 10, 20, 40, 60, 80, 100, 250, 500, 750, 1000]
+    maxheight   = [1,2,3,5,6,7,8,9,10]
 
     print 'Tuning random forest'
     for height in maxheight:
@@ -504,4 +513,7 @@ if TUNING:
     tune_randomForest(data)
 else:
     # run with default constants
+    PRUNE = False
+    default_fit(data)
+    PRUNE = True
     default_fit(data)
